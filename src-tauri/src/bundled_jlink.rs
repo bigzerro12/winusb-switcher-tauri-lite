@@ -103,6 +103,33 @@ fn safe_join(base: &Path, rel: &Path) -> Option<PathBuf> {
 pub fn extract_zip(zip_path: &Path, dst_dir: &Path) -> AppResult<()> {
     std::fs::create_dir_all(dst_dir).map_err(|e| AppError::Io(e.to_string()))?;
 
+    // Quick sanity-check: users cloning via Git without LFS will get a tiny text pointer file,
+    // not the actual zip payload. Detect and return an actionable error message.
+    let mut header = [0u8; 64];
+    let mut header_file =
+        std::fs::File::open(zip_path).map_err(|e| AppError::Io(e.to_string()))?;
+    let n = header_file
+        .read(&mut header)
+        .map_err(|e| AppError::Io(e.to_string()))?;
+    let header_str = String::from_utf8_lossy(&header[..n]);
+    if header_str.starts_with("version https://git-lfs.github.com/spec/v1") {
+        return Err(AppError::Platform(format!(
+            "Bundled J-Link payload is missing (Git LFS pointer file detected).\n\
+            If you cloned the repo, install Git LFS and run:\n\
+            \n\
+              git lfs install\n\
+              git lfs pull\n\
+            \n\
+            Then rebuild the app."
+        )));
+    }
+    if n >= 2 && &header[..2] != b"PK" {
+        return Err(AppError::Internal(format!(
+            "Bundled J-Link zip is invalid or incomplete: {}",
+            zip_path.display()
+        )));
+    }
+
     let f = std::fs::File::open(zip_path).map_err(|e| AppError::Io(e.to_string()))?;
     let mut archive = zip::ZipArchive::new(f).map_err(|e| AppError::Internal(e.to_string()))?;
 
