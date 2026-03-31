@@ -1,10 +1,10 @@
 {
-  "name": "winusb-switcher",
+  "name": "winusb-switcher-lite",
   "version": "1.0.0",
-  "description": "WinUSB Switcher — J-Link USB driver helper",
+  "description": "WinUSB Switcher Lite — bundled J-Link USB driver helper",
   "license": "MIT",
   "author": {
-    "name": "WinUSB Switcher",
+    "name": "WinUSB Switcher Lite",
     "email": "probe-configurator@example.com"
   },
   "scripts": {

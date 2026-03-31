@@ -1,12 +1,12 @@
 [package]
-name = "winusb-switcher"
+name = "winusb-switcher-lite"
 version = "1.0.0"
-description = "WinUSB Switcher — J-Link USB driver helper"
-authors = ["WinUSB Switcher"]
+description = "WinUSB Switcher Lite — bundled J-Link USB driver helper"
+authors = ["WinUSB Switcher Lite"]
 edition = "2021"
 
 [lib]
-name = "winusb_switcher_lib"
+name = "winusb_switcher_lite_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -26,6 +26,7 @@ dirs = "5"
 which = "6"
 ctrlc = "3"
 thiserror = "1"
+zip = "2"
 
 
 [profile.release]

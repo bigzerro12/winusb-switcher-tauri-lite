@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { useProbeStore } from "./store/probeStore";
 import Dashboard from "./pages/Dashboard";
-import InstallJLink from "./pages/InstallJLink";
 
 const BODY_PADDING = 24; // 12px top + 12px bottom (matches body padding in styles.css)
 
@@ -26,7 +25,7 @@ async function resizeHeightToContent() {
 }
 
 export default function App() {
-  const { isInstalled, isLoading, checkInstallation } = useProbeStore();
+  const { isInstalled, checkInstallation } = useProbeStore();
 
   useEffect(() => {
     // MUST call checkInstallation on mount
@@ -52,10 +51,6 @@ export default function App() {
   }
 
   // Phase 2: checked but not installed
-  if (!isInstalled) {
-    return <InstallJLink />;
-  }
-
-  // Phase 3: installed — show main dashboard
+  // Lite: always show dashboard (bundled J-Link is extracted at startup).
   return <Dashboard />;
 }

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "WinUSB Switcher",
+  "productName": "WinUSB Switcher Lite",
   "version": "1.0.0",
-  "identifier": "com.winusbswitcher.app",
+  "identifier": "com.winusbswitcher.lite",
   "build": {
     "frontendDist": "../out/renderer",
     "devUrl": "http://localhost:5173",
@@ -13,7 +13,7 @@
     "withGlobalTauri": false,
     "windows": [
       {
-        "title": "WinUSB Switcher",
+        "title": "WinUSB Switcher Lite",
         "width": 770,
         "height": 530,
         "minWidth": 500,
@@ -35,6 +35,9 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "resources": [
+      "resources/**/*"
     ]
   },
   "plugins": {

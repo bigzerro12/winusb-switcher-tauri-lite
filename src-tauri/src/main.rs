@@ -5,5 +5,5 @@ fn main() {
     {
         let _ = ctrlc::set_handler(|| std::process::exit(0));
     }
-    winusb_switcher_lib::run();
+    winusb_switcher_lite_lib::run();
 }
