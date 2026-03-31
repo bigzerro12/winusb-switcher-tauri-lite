@@ -8,7 +8,7 @@ mod platform;
 mod process;
 mod state;
 
-use commands::probe;
+use commands::{lite, probe};
 use state::JLinkState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -17,12 +17,6 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(JLinkState::new(default_bin))
-        .setup(|app| {
-            // Lite: ship a pinned J-Link distribution and make it available immediately.
-            // This runs before the frontend starts invoking commands.
-            let _ = crate::bundled_jlink::ensure_extracted_and_on_path(&app.handle());
-            Ok(())
-        })
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
@@ -31,6 +25,7 @@ pub fn run() {
         )
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
+            lite::prepare_bundled_jlink,
             // Probe
             probe::detect_and_scan,
             probe::scan_probes,

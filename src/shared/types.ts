@@ -83,6 +83,8 @@ export type ArchInfo = {
 // ─── Tauri Command Names ──────────────────────────────────────────────────────
 
 export const COMMANDS = {
+  /** Lite only: extract bundled J-Link before scanning */
+  PREPARE_BUNDLED_JLINK: "prepare_bundled_jlink",
   // Probe
   DETECT_AND_SCAN:    "detect_and_scan",
   SCAN_PROBES:        "scan_probes",
