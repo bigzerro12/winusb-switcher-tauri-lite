@@ -17,7 +17,8 @@ fn main() {
                 }
                 let zip_path = std::path::PathBuf::from(zip_path);
                 let dst_dir = std::path::PathBuf::from(dst_dir);
-                match winusb_switcher_lite_lib::extract_zip(&zip_path, &dst_dir) {
+                match winusb_switcher_lite_lib::extract_zip(&zip_path, &dst_dir)
+                    .and_then(|_| winusb_switcher_lite_lib::linux_post_extract_fixups(&dst_dir)) {
                     Ok(()) => std::process::exit(0),
                     Err(e) => {
                         eprintln!("Extraction failed: {}", e);

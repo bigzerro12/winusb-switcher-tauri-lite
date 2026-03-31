@@ -162,6 +162,27 @@ pub fn extract_zip(zip_path: &Path, dst_dir: &Path) -> AppResult<()> {
     Ok(())
 }
 
+#[cfg(unix)]
+fn set_exec_bit(path: &Path) -> AppResult<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let meta = std::fs::metadata(path).map_err(|e| AppError::Io(e.to_string()))?;
+    let mut perms = meta.permissions();
+    perms.set_mode(perms.mode() | 0o111);
+    std::fs::set_permissions(path, perms).map_err(|e| AppError::Io(e.to_string()))?;
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+pub fn linux_post_extract_fixups(dst_dir: &Path) -> AppResult<()> {
+    // The DEB-derived folder often loses executable bits when we package/extract via zip.
+    // Ensure at least `JLinkExe` is runnable.
+    let jlink_exe = dst_dir.join("JLinkExe");
+    if jlink_exe.exists() {
+        set_exec_bit(&jlink_exe)?;
+    }
+    Ok(())
+}
+
 #[cfg(target_os = "windows")]
 pub fn ensure_extracted_and_on_path(app: &AppHandle) -> AppResult<PathBuf> {
     let arch = BundledArch::from_rust_arch()
@@ -249,15 +270,10 @@ pub fn ensure_extracted_and_on_path(app: &AppHandle) -> AppResult<PathBuf> {
             Err(e) => return Err(e),
         }
 
-        // Ensure executable bit is set.
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            if let Ok(meta) = std::fs::metadata(&jlink_exe) {
-                let mut perms = meta.permissions();
-                perms.set_mode(perms.mode() | 0o111);
-                let _ = std::fs::set_permissions(&jlink_exe, perms);
-            }
+        // Ensure executable bits are correct. If we elevated via pkexec, the helper
+        // performs these fixups as root.
+        if let Err(e) = linux_post_extract_fixups(&dst_dir) {
+            log::warn!("[jlink] Post-extract fixups failed: {}", e);
         }
     }
 
