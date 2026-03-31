@@ -7,6 +7,8 @@ import { COMMANDS } from "@shared/types";
 
 const BODY_PADDING = 24; // 12px top + 12px bottom (matches body padding in styles.css)
 
+const isLinux = () => navigator.userAgent.toLowerCase().includes("linux");
+
 // Resize only the window HEIGHT to fit content; preserves whatever width the user has set.
 async function resizeHeightToContent() {
   await new Promise<void>((r) => setTimeout(r, 80)); // wait one paint for DOM to settle
@@ -69,7 +71,11 @@ export default function App() {
           <p className="mt-3 text-center text-[13px] leading-relaxed text-slate-600">
             A one-time setup is preparing the embedded J-Link components. This usually completes in under a minute.
           </p>
-          <p className="mt-5 text-center text-xs text-slate-500">Please keep this window open.</p>
+          <p className="mt-5 text-center text-xs text-slate-500">
+            {isLinux()
+              ? "Administrator authorization may be requested to complete setup."
+              : "Please keep this window open."}
+          </p>
           <div className="mt-8 h-1 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label="Setup in progress">
             <div className="bootstrap-lite-progress h-full w-2/5 rounded-full bg-slate-500/85" />
           </div>
