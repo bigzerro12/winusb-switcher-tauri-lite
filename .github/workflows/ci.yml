@@ -64,13 +64,13 @@ jobs:
       - name: Install frontend dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Build frontend + Tauri bundles
-        run: |
-          if [ "${{ matrix.label }}" = "linux" ]; then
-            yarn tauri:build -- --bundles deb,appimage
-          else
-            yarn tauri:build
-          fi
+      - name: Build frontend + Tauri bundles (Linux)
+        if: matrix.label == 'linux'
+        run: yarn tauri:build -- --bundles deb,appimage
+
+      - name: Build frontend + Tauri bundles (non-Linux)
+        if: matrix.label != 'linux'
+        run: yarn tauri:build
 
       - name: Upload bundle artifacts
         uses: actions/upload-artifact@v4
