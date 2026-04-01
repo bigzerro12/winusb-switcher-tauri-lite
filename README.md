@@ -65,7 +65,115 @@ If you see errors about an invalid zip or “LFS pointer” at runtime, the real
 
 ## Development
 
-**Requirements:** Node **20+**, **Yarn classic 1.x**, **Rust stable**, OS packages per [Tauri prerequisites](https://tauri.app/start/prerequisites/).
+This repo is a **Tauri 2** app. You need:
+
+- **Node.js** (recommended via **NVM**) for the React/Vite frontend
+- **Yarn classic (v1)** for JS dependencies (`yarn.lock`)
+- **Rust/Cargo** (via **rustup**) for the Tauri backend
+- OS-level dependencies required by **Tauri/WebView**
+
+Tauri’s OS dependency list is here:
+
+- [Tauri prerequisites](https://tauri.app/start/prerequisites/)
+
+### Install toolchains (recommended)
+
+#### Windows
+
+1. **NVM for Windows**: install from the official `nvm-windows` releases.
+2. Install Node 20 and enable it:
+
+```bash
+nvm install 20
+nvm use 20
+node --version
+```
+
+3. Install **Yarn classic**:
+
+```bash
+npm install -g yarn
+yarn --version   # expect 1.22.x
+```
+
+4. Install **Rust** (rustup) and verify:
+
+```bash
+rustc --version
+cargo --version
+```
+
+5. Install Windows build prerequisites for Tauri (MSVC build tools) per the Tauri docs.
+
+#### macOS
+
+1. Install Xcode Command Line Tools:
+
+```bash
+xcode-select --install
+```
+
+2. Install **NVM**, then Node 20:
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+source ~/.zshrc  # or ~/.bashrc
+nvm install 20
+nvm use 20
+node --version
+```
+
+3. Install **Yarn classic**:
+
+```bash
+npm install -g yarn
+yarn --version
+```
+
+4. Install **Rust** (rustup) and verify:
+
+```bash
+rustc --version
+cargo --version
+```
+
+#### Linux (Ubuntu/Debian example)
+
+1. Install build prerequisites for Tauri/WebKitGTK per the Tauri docs.
+2. Install **NVM**, then Node 20:
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+source ~/.bashrc
+nvm install 20
+nvm use 20
+node --version
+```
+
+3. Install **Yarn classic**:
+
+```bash
+npm install -g yarn
+yarn --version
+```
+
+4. Install **Rust** (rustup) and verify:
+
+```bash
+rustc --version
+cargo --version
+```
+
+### Repo-specific notes
+
+- **Git LFS is required**: bundled J-Link zips are stored in LFS.
+
+```bash
+git lfs install
+git lfs pull
+```
+
+- **Tauri CLI**: uses local `@tauri-apps/cli` (devDependency). Use `yarn tauri:dev` / `yarn tauri:build` after `yarn install`.
 
 ```bash
 yarn install
