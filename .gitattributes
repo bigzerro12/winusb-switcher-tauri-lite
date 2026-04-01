@@ -1,1 +1,1 @@
-src-tauri/resources/jlink/**/JLink_V930a.zip filter=lfs diff=lfs merge=lfs -text
+src-tauri/jlink-bundles/**/JLink_V930a.zip filter=lfs diff=lfs merge=lfs -text

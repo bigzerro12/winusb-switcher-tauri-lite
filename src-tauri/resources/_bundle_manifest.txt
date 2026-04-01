@@ -1,0 +1,2 @@
+WinUSB Switcher Lite stages SEGGER J-Link zip payloads per build target only.
+Canonical archives live under src-tauri/jlink-bundles/; see scripts/stage-jlink-for-build.mjs.

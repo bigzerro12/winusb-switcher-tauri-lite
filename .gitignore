@@ -38,3 +38,6 @@ test_jlink.exe
 
 # ── Icon source (keep generated icons, ignore raw source) ─────────────────────
 resources/icon-source.png
+
+# Staged J-Link zip for the active platform only (see scripts/stage-jlink-for-build.mjs)
+src-tauri/resources/jlink/

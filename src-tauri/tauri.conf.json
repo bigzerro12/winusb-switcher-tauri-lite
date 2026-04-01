@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../out/renderer",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "yarn dev",
-    "beforeBuildCommand": "yarn build"
+    "beforeDevCommand": "node scripts/stage-jlink-for-build.mjs && yarn dev",
+    "beforeBuildCommand": "yarn build && node scripts/stage-jlink-for-build.mjs"
   },
   "app": {
     "withGlobalTauri": false,
@@ -37,7 +37,8 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "resources/**/*"
+      "resources/_bundle_manifest.txt",
+      "resources/jlink/**/*.zip"
     ]
   },
   "plugins": {
