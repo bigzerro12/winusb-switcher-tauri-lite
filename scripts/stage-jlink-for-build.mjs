@@ -26,6 +26,14 @@ function copyZip(src, dst) {
   fs.copyFileSync(src, dst);
 }
 
+/** 22-byte empty ZIP (EOCD only). Satisfies Tauri jlink zip resource globs when no real bundle exists for the target. */
+function emptyZipBytes() {
+  return Buffer.from([
+    0x50, 0x4b, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  ]);
+}
+
 function inferTripleFromNode() {
   const { platform, arch } = process;
   if (platform === "win32") {
@@ -90,8 +98,13 @@ rimraf(stageRoot);
 
 if (!mapped) {
   fs.mkdirSync(stageRoot, { recursive: true });
+  // Tauri fails the build if `resources/jlink/**/*.zip` matches nothing; write a tiny valid empty ZIP.
+  const stubDir = path.join(stageRoot, "darwin", "universal");
+  fs.mkdirSync(stubDir, { recursive: true });
+  const stubZip = path.join(stubDir, zipName);
+  fs.writeFileSync(stubZip, emptyZipBytes());
   console.log(
-    "[stage-jlink] No bundled J-Link zip for this target; staged empty resources/jlink (macOS / unsupported)."
+    "[stage-jlink] macOS/universal: staged empty ZIP stub at resources/jlink/darwin/universal/ (runtime bundled J-Link not implemented; satisfies bundle glob)."
   );
   process.exit(0);
 }
