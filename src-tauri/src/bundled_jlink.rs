@@ -172,6 +172,55 @@ fn set_exec_bit(path: &Path) -> AppResult<()> {
     Ok(())
 }
 
+/// When files under `/opt/SEGGER` are root-owned (e.g. after `pkexec` extract), unprivileged `chmod` fails
+/// with EPERM. Fall back to PolicyKit so the user can grant a one-shot `chmod +x`.
+#[cfg(target_os = "linux")]
+fn try_pkexec_chmod_x(path: &Path) {
+    use std::process::Command;
+
+    let status = Command::new("pkexec")
+        .args(["chmod", "+x"])
+        .arg(path)
+        .status();
+
+    match status {
+        Ok(s) if s.success() => {
+            log::info!("[jlink] pkexec chmod +x {}", path.display());
+        }
+        Ok(s) => {
+            log::warn!(
+                "[jlink] pkexec chmod +x {} failed with status {}",
+                path.display(),
+                s
+            );
+        }
+        Err(e) => {
+            log::warn!("[jlink] pkexec chmod +x {}: {}", path.display(), e);
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn ensure_linux_exec_bit(path: &Path) {
+    if let Err(e) = set_exec_bit(path) {
+        log::warn!("[jlink] chmod {}: {}", path.display(), e);
+        try_pkexec_chmod_x(path);
+    }
+}
+
+/// Typical SEGGER Linux CLI/GUI binaries next to `JLinkExe` (DEB layout; no `.exe` suffix on Linux).
+#[cfg(target_os = "linux")]
+const LINUX_SEGGER_EXECUTABLE_NAMES: &[&str] = &[
+    "JLinkExe",
+    "JLinkConfigExe",
+    "JLinkGDBServer",
+    "JLinkGDBServerCLExe",
+    "JLinkGUIServerExe",
+    "JFlashLiteExe",
+    "JLinkLicenseManagerExe",
+    "JLinkRegistrationExe",
+];
+
 /// Linux install root is `/opt/SEGGER`. The zip may unpack either:
 /// - flat: `/opt/SEGGER/JLinkExe`, or
 /// - nested: `/opt/SEGGER/JLink_V930a/JLinkExe` (legacy layout).
@@ -194,12 +243,24 @@ fn linux_resolve_jlink_exe(dst_root: &Path) -> Option<PathBuf> {
 }
 
 #[cfg(target_os = "linux")]
+fn linux_segger_install_dirs(dst_root: &Path) -> Vec<PathBuf> {
+    let mut dirs = vec![dst_root.to_path_buf()];
+    let nested = dst_root.join(BUNDLED_DIR_NAME);
+    if nested.is_dir() {
+        dirs.push(nested);
+    }
+    dirs
+}
+
+#[cfg(target_os = "linux")]
 pub fn linux_post_extract_fixups(dst_root: &Path) -> AppResult<()> {
     // The DEB-derived folder often loses executable bits when we package/extract via zip.
-    for p in linux_jlink_exe_candidates(dst_root) {
-        if p.exists() {
-            if let Err(e) = set_exec_bit(&p) {
-                log::warn!("[jlink] chmod {}: {}", p.display(), e);
+    // Under `/opt`, extraction may be root-owned; use `pkexec chmod` when `chmod` returns EPERM.
+    for dir in linux_segger_install_dirs(dst_root) {
+        for name in LINUX_SEGGER_EXECUTABLE_NAMES {
+            let p = dir.join(name);
+            if p.is_file() {
+                ensure_linux_exec_bit(&p);
             }
         }
     }

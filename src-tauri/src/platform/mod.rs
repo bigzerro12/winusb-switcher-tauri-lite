@@ -95,5 +95,25 @@ pub fn prepend_ld_library_path(dir: &str) {
 pub fn ensure_jlink_runtime_env(install_dir: &str) {
     prepend_to_process_path(install_dir);
     #[cfg(target_os = "linux")]
+    prepend_ld_library_path_segger_layout(install_dir);
+}
+
+/// Linux: prepend `LD_LIBRARY_PATH` entries for a typical SEGGER tree. Some packages put `*.so`
+/// under `x86/` or `x86_64/`; search order keeps `install_dir` **first**, then subfolders.
+#[cfg(target_os = "linux")]
+fn prepend_ld_library_path_segger_layout(install_dir: &str) {
+    let base = std::path::Path::new(install_dir);
+    let mut extras: Vec<String> = Vec::new();
+    for sub in ["x86", "x86_64", "amd64"] {
+        let p = base.join(sub);
+        if p.is_dir() {
+            extras.push(p.to_string_lossy().to_string());
+        }
+    }
+    // Each prepend puts the new segment at the **front**. Prepend subdirs first so `install_dir`
+    // ends up leftmost (highest priority).
+    for p in extras {
+        prepend_ld_library_path(&p);
+    }
     prepend_ld_library_path(install_dir);
 }
