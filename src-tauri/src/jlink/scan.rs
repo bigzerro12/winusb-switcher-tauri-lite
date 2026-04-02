@@ -67,28 +67,27 @@ fn fetch_firmware_dates(bin: &str, count: usize) -> Vec<Option<String>> {
         }
     };
 
-    // Split on "Select emulator index:" — one section per selectprobe prompt
-    let delimiter = if stdout.contains("Select emulator index:") {
-        "Select emulator index:"
-    } else {
-        "Connecting to J-Link via USB...O.K."
-    };
-
-    let sections: Vec<&str> = stdout.split(delimiter).collect();
+    // Collect `Firmware: ... compiled <date>` lines in order. This is more reliable than
+    // splitting on "Connecting...O.K." because on Linux the banner often shows
+    // `Connecting to J-Link via USB...FAILED` (or mixed OK/FAIL), which breaks delimiter-based parsing.
     let mut results = vec![None; count];
-
-    for (i, section) in sections.iter().skip(1).enumerate() {
-        if i >= count { break; }
-        for line in section.lines() {
-            if line.contains("Firmware:") && line.contains("compiled") {
-                if let Some(pos) = line.find("compiled ") {
-                    let date = line[pos + 9..].trim().to_string();
-                    log::info!("[jlink] Probe[{}] firmware: {}", i, date);
-                    results[i] = Some(date);
+    let mut idx = 0usize;
+    for line in stdout.lines() {
+        if line.contains("Firmware:") && line.contains("compiled") {
+            if let Some(pos) = line.find("compiled ") {
+                let date = line[pos + 9..].trim().to_string();
+                if !date.is_empty() && idx < count {
+                    log::info!("[jlink] Probe[{}] firmware: {}", idx, date);
+                    results[idx] = Some(date);
+                    idx += 1;
                 }
-                break;
             }
         }
+    }
+    if idx == 0 && count > 0 {
+        log::warn!(
+            "[jlink] No Firmware: lines parsed (USB connect may be flaky; check udev/plugdev and close other J-Link tools)"
+        );
     }
     results
 }

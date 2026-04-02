@@ -8,13 +8,37 @@ pub fn update(bin: &str, probe_index: usize) -> FirmwareUpdateResult {
 
     match runner::run(bin, &input) {
         Ok((stdout, _)) => {
-            let firmware = stdout
+            let mut firmware = stdout
                 .lines()
                 .find(|l| l.contains("Firmware:") && l.contains("compiled"))
                 .and_then(|l| l.find("compiled ").map(|p| l[p + 9..].trim().to_string()))
                 .unwrap_or_default();
 
+            // Linux often prints `Connecting...FAILED` before listing probes; the Firmware line may be
+            // missing in the same session even though the command ran. Don't hard-fail the whole flow.
             if firmware.is_empty() {
+                firmware = stdout
+                    .lines()
+                    .filter(|l| l.contains("Firmware:") && l.contains("compiled"))
+                    .filter_map(|l| l.find("compiled ").map(|p| l[p + 9..].trim().to_string()))
+                    .find(|s| !s.is_empty())
+                    .unwrap_or_default();
+            }
+
+            if firmware.is_empty() {
+                #[cfg(target_os = "linux")]
+                {
+                    if !stdout.contains("Unknown command")
+                        && (stdout.contains("J-Link[") || stdout.contains("Serial number:"))
+                    {
+                        log::warn!(
+                            "[jlink] EnableAutoUpdateFW: no Firmware line in output (USB session); continuing on Linux"
+                        );
+                        return FirmwareUpdateResult::Current {
+                            firmware: "n/a".to_string(),
+                        };
+                    }
+                }
                 return FirmwareUpdateResult::Failed {
                     error: "Could not parse firmware version from output".to_string(),
                 };

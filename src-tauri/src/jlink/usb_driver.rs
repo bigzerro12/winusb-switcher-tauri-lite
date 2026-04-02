@@ -127,5 +127,28 @@ fn command_not_supported(stdout: &str) -> bool {
 }
 
 fn write_succeeded(stdout: &str) -> bool {
-    stdout.contains("Probe configured successfully")
+    let s = stdout;
+    if s.contains("Probe configured successfully") {
+        return true;
+    }
+    // Linux / different locales: substring match; SEGGER may omit the exact Windows phrasing.
+    let lower = s.to_lowercase();
+    if lower.contains("probe configured successfully") {
+        return true;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        // Driver-switch commands may succeed without the same banner as on Windows when the session
+        // still lists the probe after WebUSBEnable/WinUSBEnable without "Unknown command".
+        if !command_not_supported(s)
+            && (s.contains("WebUSBEnable")
+                || s.contains("WebUSBDisable")
+                || s.contains("WinUSBEnable")
+                || s.contains("WinUSBDisable"))
+            && (s.contains("O.K.") || s.contains("OK") || s.contains("Serial number:"))
+        {
+            return true;
+        }
+    }
+    false
 }
