@@ -173,38 +173,35 @@ fn set_exec_bit(path: &Path) -> AppResult<()> {
 }
 
 /// When files under `/opt/SEGGER` are root-owned (e.g. after `pkexec` extract), unprivileged `chmod` fails
-/// with EPERM. Fall back to PolicyKit so the user can grant a one-shot `chmod +x`.
+/// with EPERM. Fall back to **one** PolicyKit prompt for all paths: `pkexec chmod +x file1 file2 ...`.
 #[cfg(target_os = "linux")]
-fn try_pkexec_chmod_x(path: &Path) {
+fn try_pkexec_chmod_x_many(paths: &[PathBuf]) {
     use std::process::Command;
 
-    let status = Command::new("pkexec")
-        .args(["chmod", "+x"])
-        .arg(path)
-        .status();
+    if paths.is_empty() {
+        return;
+    }
 
-    match status {
+    let mut cmd = Command::new("pkexec");
+    cmd.arg("chmod").arg("+x");
+    for p in paths {
+        cmd.arg(p);
+    }
+
+    match cmd.status() {
         Ok(s) if s.success() => {
-            log::info!("[jlink] pkexec chmod +x {}", path.display());
-        }
-        Ok(s) => {
-            log::warn!(
-                "[jlink] pkexec chmod +x {} failed with status {}",
-                path.display(),
-                s
+            log::info!(
+                "[jlink] pkexec chmod +x ({} file(s), e.g. {})",
+                paths.len(),
+                paths[0].display()
             );
         }
-        Err(e) => {
-            log::warn!("[jlink] pkexec chmod +x {}: {}", path.display(), e);
+        Ok(s) => {
+            log::warn!("[jlink] pkexec chmod +x batch failed with status {}", s);
         }
-    }
-}
-
-#[cfg(target_os = "linux")]
-fn ensure_linux_exec_bit(path: &Path) {
-    if let Err(e) = set_exec_bit(path) {
-        log::warn!("[jlink] chmod {}: {}", path.display(), e);
-        try_pkexec_chmod_x(path);
+        Err(e) => {
+            log::warn!("[jlink] pkexec chmod +x batch: {}", e);
+        }
     }
 }
 
@@ -255,14 +252,21 @@ fn linux_segger_install_dirs(dst_root: &Path) -> Vec<PathBuf> {
 #[cfg(target_os = "linux")]
 pub fn linux_post_extract_fixups(dst_root: &Path) -> AppResult<()> {
     // The DEB-derived folder often loses executable bits when we package/extract via zip.
-    // Under `/opt`, extraction may be root-owned; use `pkexec chmod` when `chmod` returns EPERM.
+    // Under `/opt`, extraction may be root-owned; batch `pkexec chmod` so PolicyKit prompts once.
+    let mut need_pkexec: Vec<PathBuf> = Vec::new();
     for dir in linux_segger_install_dirs(dst_root) {
         for name in LINUX_SEGGER_EXECUTABLE_NAMES {
             let p = dir.join(name);
             if p.is_file() {
-                ensure_linux_exec_bit(&p);
+                if let Err(e) = set_exec_bit(&p) {
+                    log::warn!("[jlink] chmod {}: {}", p.display(), e);
+                    need_pkexec.push(p);
+                }
             }
         }
+    }
+    if !need_pkexec.is_empty() {
+        try_pkexec_chmod_x_many(&need_pkexec);
     }
     Ok(())
 }

@@ -17,12 +17,22 @@ pub fn run(bin: &str, input: &str) -> AppResult<(String, String)> {
     log::debug!("[jlink] Running: {} -NoGUI 1", bin);
     log::debug!("[jlink] Input:\n{}", input);
 
-    let mut child = Command::new(bin)
-        .args(["-NoGUI", "1"])
+    let mut cmd = Command::new(bin);
+    cmd.args(["-NoGUI", "1"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .no_window()
+        .no_window();
+
+    #[cfg(target_os = "linux")]
+    if let Ok(dir) = std::env::var("WINUSB_JLINK_INSTALL_DIR") {
+        let p = std::path::Path::new(&dir);
+        if p.is_dir() {
+            cmd.current_dir(p);
+        }
+    }
+
+    let mut child = cmd
         .spawn()
         .map_err(|e| AppError::JLinkNotFound(e.to_string()))?;
 

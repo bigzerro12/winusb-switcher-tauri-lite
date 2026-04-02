@@ -95,25 +95,52 @@ pub fn prepend_ld_library_path(dir: &str) {
 pub fn ensure_jlink_runtime_env(install_dir: &str) {
     prepend_to_process_path(install_dir);
     #[cfg(target_os = "linux")]
-    prepend_ld_library_path_segger_layout(install_dir);
+    {
+        apply_ld_library_path_segger_layout(install_dir);
+        // Used by `jlink::runner` so the J-Link child process runs with the same working directory
+        // as a manual install (some SEGGER layouts rely on `$ORIGIN`/relative paths).
+        std::env::set_var("WINUSB_JLINK_INSTALL_DIR", install_dir);
+    }
 }
 
-/// Linux: prepend `LD_LIBRARY_PATH` entries for a typical SEGGER tree. Some packages put `*.so`
-/// under `x86/` or `x86_64/`; search order keeps `install_dir` **first**, then subfolders.
+/// Linux: set `LD_LIBRARY_PATH` for a typical SEGGER tree in one shot. Some packages put `*.so`
+/// under `x86_64/` or `x86/`; order is **install root first**, then host-relevant arch dirs.
 #[cfg(target_os = "linux")]
-fn prepend_ld_library_path_segger_layout(install_dir: &str) {
+fn apply_ld_library_path_segger_layout(install_dir: &str) {
+    const KEY: &str = "LD_LIBRARY_PATH";
     let base = std::path::Path::new(install_dir);
-    let mut extras: Vec<String> = Vec::new();
-    for sub in ["x86", "x86_64", "amd64"] {
+
+    let mut front: Vec<String> = Vec::new();
+    let push_unique = |v: &mut Vec<String>, s: String| {
+        if !v.iter().any(|e| e == &s) {
+            v.push(s);
+        }
+    };
+
+    push_unique(&mut front, install_dir.to_string());
+
+    // Prefer native arch before 32-bit `x86/` on 64-bit hosts (wrong ELF breaks dlopen).
+    let sub_order: &[&str] = match std::env::consts::ARCH {
+        "x86_64" => &["x86_64", "amd64", "x86"],
+        "aarch64" => &["aarch64", "arm64"],
+        _ => &["x86_64", "amd64", "x86", "aarch64", "arm64"],
+    };
+    for sub in sub_order {
         let p = base.join(sub);
         if p.is_dir() {
-            extras.push(p.to_string_lossy().to_string());
+            push_unique(&mut front, p.to_string_lossy().into_owned());
         }
     }
-    // Each prepend puts the new segment at the **front**. Prepend subdirs first so `install_dir`
-    // ends up leftmost (highest priority).
-    for p in extras {
-        prepend_ld_library_path(&p);
+
+    let current = std::env::var(KEY).unwrap_or_default();
+    for seg in current.split(':') {
+        if seg.is_empty() {
+            continue;
+        }
+        push_unique(&mut front, seg.to_string());
     }
-    prepend_ld_library_path(install_dir);
+
+    let joined = front.join(":");
+    std::env::set_var(KEY, &joined);
+    log::info!("[jlink] {}={}", KEY, joined);
 }
