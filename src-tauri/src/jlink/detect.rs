@@ -40,7 +40,7 @@ fn detect_from_dir(dir: &Path, global_bin: &str, executable: &str) -> InstallSta
     // Add the directory to this process's in-memory PATH so all subsequent
     // JLink invocations can use the short name ("JLink") without a full path.
     // No changes are made to the user or system environment.
-    platform::prepend_to_process_path(&dir_str);
+    platform::ensure_jlink_runtime_env(&dir_str);
 
     if let Ok((stdout, _)) = runner::run(global_bin, scripts::detect()) {
         if let Some(version) = runner::parse_version(&stdout) {

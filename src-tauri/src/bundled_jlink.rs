@@ -213,7 +213,7 @@ pub fn ensure_extracted_and_on_path(app: &AppHandle) -> AppResult<PathBuf> {
         log::info!("[jlink] Using bundled J-Link at {}", dst_dir.display());
     }
 
-    platform::prepend_to_process_path(&dst_dir.to_string_lossy().to_string());
+    platform::ensure_jlink_runtime_env(&dst_dir.to_string_lossy().to_string());
     Ok(dst_dir)
 }
 
@@ -284,7 +284,7 @@ pub fn ensure_extracted_and_on_path(app: &AppHandle) -> AppResult<PathBuf> {
         )));
     }
 
-    platform::prepend_to_process_path(&dst_dir.to_string_lossy().to_string());
+    platform::ensure_jlink_runtime_env(&dst_dir.to_string_lossy().to_string());
     Ok(dst_dir)
 }
 
