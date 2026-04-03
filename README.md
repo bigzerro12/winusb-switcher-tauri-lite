@@ -30,9 +30,9 @@ Release **installers** are built per OS; each artifact contains **only** the J-L
 3. Commit and push to `main`, then tag and push:
    ```bash
    git checkout main && git pull
-   git tag v1.0.4
+   git tag v1.0.5
    git push origin main
-   git push origin v1.0.4
+   git push origin v1.0.5
    ```
 4. Wait for **Build WinUSB Switcher Lite** → **release**; open the **Releases** tab for assets.
 
@@ -210,7 +210,9 @@ Workflows live under [`.github/workflows/`](.github/workflows/). Checkout uses *
 - **Invalid zip / EOCD / LFS pointer** — Install Git LFS, `git lfs pull`, rebuild.
 - **Linux permission denied under `/opt`** — On first run, Lite installs the bundled J-Link under `/opt/SEGGER`. If `/opt` is not writable, you’ll be prompted **once** via **pkexec** to complete extraction + permission fixups.
 - **“J-Link not found” after bootstrap** — Ensure staging ran (use `yarn tauri:dev` / `yarn tauri:build`), and on Linux that `JLinkExe` exists under `/opt/SEGGER` (flat) or `/opt/SEGGER/JLink_V930a` (nested zip) and is executable.
-- **Linux can’t see probes / permission denied opening USB device** — The app installs SEGGER’s **`99-jlink.rules`** (from the bundled zip) automatically **in the same elevated step as `/opt` extraction** when `pkexec` is used—no separate `sudo` for udev in that path. If you use a rare setup where `/opt` is user-writable, the app may prompt **once** with `pkexec` only for udev. You can also install rules manually:
+- **Linux can’t see probes / permission denied opening USB device** — The app installs SEGGER’s **`99-jlink.rules`** (from the bundled tree under `/opt/SEGGER`, including `ETC/udev/rules.d/` layouts) **on each startup** if the file is missing or differs from the bundle. The first install may use **`pkexec`** when `/etc` is not writable. If you upgraded from a build that skipped udev when `/opt` was already populated, open the app once and approve the prompt, or install rules manually below.
+
+- **Linux: no `99-jlink.rules` after upgrading** — Releases before this behavior only installed udev during *first-time* extraction. If `JLinkExe` was already under `/opt/SEGGER`, udev was never copied. **v1.0.5+** re-checks on every launch; alternatively copy rules manually:
 
 ```bash
 # Example (adjust if your system uses a different file name/path)

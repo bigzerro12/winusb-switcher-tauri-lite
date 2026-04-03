@@ -293,14 +293,22 @@ pub fn linux_post_extract_fixups(dst_root: &Path) -> AppResult<()> {
     Ok(())
 }
 
-/// SEGGER Linux packages ship `99-jlink.rules` (sometimes `70-jlink.rules`) next to the tools.
+/// SEGGER Linux packages ship `99-jlink.rules` (sometimes `70-jlink.rules`) next to the tools,
+/// or under `ETC/udev/rules.d/` in some tarball layouts.
 #[cfg(target_os = "linux")]
 fn linux_segger_udev_rules_src(dst_root: &Path) -> Option<PathBuf> {
+    let flat_bases = [dst_root.join(BUNDLED_DIR_NAME), dst_root.to_path_buf()];
     for name in ["99-jlink.rules", "70-jlink.rules"] {
-        for base in [dst_root.join(BUNDLED_DIR_NAME), dst_root.to_path_buf()] {
-            let p = base.join(name);
-            if p.is_file() {
-                return Some(p);
+        for base in &flat_bases {
+            let candidates = [
+                base.join(name),
+                base.join("ETC").join("udev").join("rules.d").join(name),
+                base.join("etc").join("udev").join("rules.d").join(name),
+            ];
+            for p in candidates {
+                if p.is_file() {
+                    return Some(p);
+                }
             }
         }
     }
@@ -360,6 +368,50 @@ pub fn linux_try_install_segger_udev_after_extract(dst_root: &Path) -> AppResult
         return Ok(());
     };
     linux_install_segger_udev_rules_from_src(&src)
+}
+
+#[cfg(target_os = "linux")]
+fn app_error_is_permission_denied(e: &AppError) -> bool {
+    match e {
+        AppError::Io(s) | AppError::Platform(s) | AppError::Internal(s) => {
+            s.contains("Permission denied") || s.contains("os error 13")
+        }
+        _ => false,
+    }
+}
+
+/// Ensure bundled udev rules are installed even when J-Link was already on disk (upgrade / skip extract).
+/// Skips work if `/etc/udev/rules.d/99-jlink.rules` already matches the bundled file.
+#[cfg(target_os = "linux")]
+fn linux_ensure_segger_udev_installed(dst_root: &Path) -> AppResult<()> {
+    let Some(src) = linux_segger_udev_rules_src(dst_root) else {
+        log::warn!(
+            "[jlink] No SEGGER udev rules file under {} — USB may require manual udev setup",
+            dst_root.display()
+        );
+        return Ok(());
+    };
+
+    let dest = Path::new("/etc/udev/rules.d/99-jlink.rules");
+    if dest.is_file() {
+        let same = std::fs::read(&src)
+            .ok()
+            .zip(std::fs::read(dest).ok())
+            .is_some_and(|(a, b)| a == b);
+        if same {
+            log::debug!("[jlink] udev rules already match bundled copy; skipping install");
+            return Ok(());
+        }
+    }
+
+    match linux_install_segger_udev_rules_from_src(&src) {
+        Ok(()) => Ok(()),
+        Err(e) if app_error_is_permission_denied(&e) => {
+            log::info!("[jlink] udev install needs elevation — requesting pkexec");
+            elevate_udev_install_with_pkexec(&src)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 /// When `/opt` is user-writable, extraction does not use pkexec; install udev with one extra PolicyKit prompt if needed.
@@ -517,6 +569,11 @@ pub fn ensure_extracted_and_on_path(app: &AppHandle) -> AppResult<PathBuf> {
         .parent()
         .map(Path::to_path_buf)
         .ok_or_else(|| AppError::Internal("JLinkExe has no parent path".to_string()))?;
+
+    // Udev setup must run even if we did not extract this session (existing /opt tree from older versions).
+    if let Err(e) = linux_ensure_segger_udev_installed(&dst_root) {
+        log::warn!("[jlink] Automatic udev install did not complete: {}", e);
+    }
 
     platform::ensure_jlink_runtime_env(&install_dir.to_string_lossy().to_string());
     Ok(install_dir)
