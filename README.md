@@ -205,9 +205,20 @@ yarn tauri:dev    # full app (runs staging script, then Vite + Rust)
 
 Workflows live under [`.github/workflows/`](.github/workflows/). Checkout uses **`lfs: true`** so CI pulls LFS objects before `yarn tauri:build`.
 
+**GitHub Actions fails at checkout with “exceeded its LFS budget”** — That message comes from **GitHub’s Git LFS quota** (storage + bandwidth), not from the app. Anyone cloning with LFS (including `actions/checkout` with `lfs: true`) must be able to download the `JLink_V930a.zip` objects tracked in [`.gitattributes`](.gitattributes).
+
+What you can do:
+
+1. **Restore LFS on the hosting account** (most common): GitHub → **Settings → Billing** for the user or org that owns the repo → add a **Git LFS data pack** or increase limits so transfers work again. Free tiers have a small monthly LFS bandwidth pool; tagged release builds on three OS runners can burn through it quickly.
+
+2. **Stop using LFS for the zip** (avoids LFS bandwidth on every CI run): If each archived zip is **under GitHub’s per-file push limit (100 MB)**, you can migrate the blobs into normal Git (no LFS), update `.gitattributes`, and drop `filter=lfs` for `jlink-bundles/**`. Use Git’s docs or `git lfs migrate export` carefully (this rewrites history unless you only change the tip). After that, CI still works with `lfs: true` (nothing to fetch) or you can set `lfs: false` in workflows.
+
+3. **Host zips outside GitHub** — Keep only small files in the repo and download `JLink_V930a.zip` in CI from object storage or another mirror (requires workflow + secret changes).
+
 ## Troubleshooting
 
 - **Invalid zip / EOCD / LFS pointer** — Install Git LFS, `git lfs pull`, rebuild.
+- **CI: `This repository exceeded its LFS budget`** — See **[CI/CD](#cicd)** above; increase LFS quota or migrate bundles off LFS.
 - **Linux permission denied under `/opt`** — On first run, Lite installs the bundled J-Link under `/opt/SEGGER`. If `/opt` is not writable, you’ll be prompted **once** via **pkexec** to complete extraction + permission fixups.
 - **“J-Link not found” after bootstrap** — Ensure staging ran (use `yarn tauri:dev` / `yarn tauri:build`), and on Linux that `JLinkExe` exists under `/opt/SEGGER` (flat) or `/opt/SEGGER/JLink_V930a` (nested zip) and is executable.
 - **Linux can’t see probes / permission denied opening USB device** — The app installs SEGGER’s **`99-jlink.rules`** (from the bundled tree under `/opt/SEGGER`, including `ETC/udev/rules.d/` layouts) **on each startup** if the file is missing or differs from the bundle. The first install may use **`pkexec`** when `/etc` is not writable. If you upgraded from a build that skipped udev when `/opt` was already populated, open the app once and approve the prompt, or install rules manually below.
