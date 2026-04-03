@@ -293,6 +293,101 @@ pub fn linux_post_extract_fixups(dst_root: &Path) -> AppResult<()> {
     Ok(())
 }
 
+/// SEGGER Linux packages ship `99-jlink.rules` (sometimes `70-jlink.rules`) next to the tools.
+#[cfg(target_os = "linux")]
+fn linux_segger_udev_rules_src(dst_root: &Path) -> Option<PathBuf> {
+    for name in ["99-jlink.rules", "70-jlink.rules"] {
+        for base in [dst_root.join(BUNDLED_DIR_NAME), dst_root.to_path_buf()] {
+            let p = base.join(name);
+            if p.is_file() {
+                return Some(p);
+            }
+        }
+    }
+    None
+}
+
+/// Install SEGGER udev rules so USB probes are accessible without root (requires write access to `/etc/udev`).
+#[cfg(target_os = "linux")]
+pub fn linux_install_segger_udev_rules_from_src(rules_src: &Path) -> AppResult<()> {
+    use std::process::Command;
+
+    if !rules_src.is_file() {
+        return Err(AppError::Internal(format!(
+            "udev rules file not found: {}",
+            rules_src.display()
+        )));
+    }
+
+    let dest = Path::new("/etc/udev/rules.d/99-jlink.rules");
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| AppError::Io(e.to_string()))?;
+    }
+    std::fs::copy(rules_src, dest).map_err(|e| AppError::Io(e.to_string()))?;
+
+    let s = Command::new("udevadm")
+        .args(["control", "--reload-rules"])
+        .status()
+        .map_err(|e| AppError::Platform(e.to_string()))?;
+    if !s.success() {
+        return Err(AppError::Platform(format!(
+            "udevadm control --reload-rules returned {}",
+            s
+        )));
+    }
+    let s2 = Command::new("udevadm")
+        .arg("trigger")
+        .status()
+        .map_err(|e| AppError::Platform(e.to_string()))?;
+    if !s2.success() {
+        return Err(AppError::Platform(format!("udevadm trigger returned {}", s2)));
+    }
+
+    log::info!(
+        "[jlink] Installed udev rules {} -> {}",
+        rules_src.display(),
+        dest.display()
+    );
+    Ok(())
+}
+
+/// After extraction, copy bundled rules into `/etc/udev` when running as root (e.g. pkexec helper).
+/// If no rules file is present in the tree, succeeds without doing anything.
+#[cfg(target_os = "linux")]
+pub fn linux_try_install_segger_udev_after_extract(dst_root: &Path) -> AppResult<()> {
+    let Some(src) = linux_segger_udev_rules_src(dst_root) else {
+        log::info!("[jlink] No SEGGER udev rules file in {}; skipping automatic udev install", dst_root.display());
+        return Ok(());
+    };
+    linux_install_segger_udev_rules_from_src(&src)
+}
+
+/// When `/opt` is user-writable, extraction does not use pkexec; install udev with one extra PolicyKit prompt if needed.
+#[cfg(target_os = "linux")]
+fn elevate_udev_install_with_pkexec(rules_src: &Path) -> AppResult<()> {
+    use std::process::Command;
+
+    let exe = std::env::current_exe().map_err(|e| AppError::Internal(e.to_string()))?;
+    let rules_src = rules_src
+        .canonicalize()
+        .map_err(|e| AppError::Io(e.to_string()))?;
+
+    let status = Command::new("pkexec")
+        .arg(exe)
+        .arg("--lite-install-udev")
+        .arg(&rules_src)
+        .status()
+        .map_err(|e| AppError::Platform(format!("Failed to launch pkexec for udev: {}", e)))?;
+
+    if !status.success() {
+        return Err(AppError::Platform(format!(
+            "udev install authorization failed or command returned {}",
+            status
+        )));
+    }
+    Ok(())
+}
+
 #[cfg(target_os = "windows")]
 pub fn ensure_extracted_and_on_path(app: &AppHandle) -> AppResult<PathBuf> {
     let arch = BundledArch::from_rust_arch()
@@ -387,15 +482,24 @@ pub fn ensure_extracted_and_on_path(app: &AppHandle) -> AppResult<PathBuf> {
         );
 
         if linux_dst_needs_root(&dst_root) {
-            // Single pkexec call: extract + chmod in one privilege elevation → one dialog.
+            // Single pkexec: extract + udev rules + chmod → one PolicyKit dialog.
             log::info!("[jlink] /opt/SEGGER not writable by current user — using pkexec (one prompt)");
             elevate_extract_with_pkexec(&zip_path, &dst_root)?;
-            // fixups already performed by the pkexec helper; nothing more to do.
+            // fixups + udev already performed by the pkexec helper.
         } else {
             extract_zip(&zip_path, &dst_root)?;
             // Fixups needed after user-level extraction (files extracted without +x).
             if let Err(e) = linux_post_extract_fixups(&dst_root) {
                 log::warn!("[jlink] Post-extract fixups failed: {}", e);
+            }
+            if let Some(src) = linux_segger_udev_rules_src(&dst_root) {
+                if let Err(e) = linux_install_segger_udev_rules_from_src(&src) {
+                    log::warn!(
+                        "[jlink] Could not install udev rules without elevation ({}); requesting pkexec",
+                        e
+                    );
+                    elevate_udev_install_with_pkexec(&src)?;
+                }
             }
         }
     }

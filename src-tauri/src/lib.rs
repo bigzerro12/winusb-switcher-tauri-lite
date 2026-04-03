@@ -13,7 +13,10 @@ use state::JLinkState;
 
 pub use bundled_jlink::extract_zip;
 #[cfg(target_os = "linux")]
-pub use bundled_jlink::linux_post_extract_fixups;
+pub use bundled_jlink::{
+    linux_install_segger_udev_rules_from_src, linux_post_extract_fixups,
+    linux_try_install_segger_udev_after_extract,
+};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

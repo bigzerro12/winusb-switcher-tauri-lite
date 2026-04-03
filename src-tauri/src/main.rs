@@ -1,9 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    // Linux elevation helper:
-    // `pkexec <this_exe> --lite-extract-jlink <zip_path> <dst_dir>`
-    // runs extraction as root so we can install to /opt/SEGGER.
+    // Linux elevation helpers (single PolicyKit session per invocation):
+    // - `pkexec <this_exe> --lite-extract-jlink <zip_path> <dst_dir>` — extract to /opt, install udev rules from the bundle, chmod +x.
+    // - `pkexec <this_exe> --lite-install-udev <rules_file>` — copy rules to /etc/udev when extraction did not need root.
     #[cfg(target_os = "linux")]
     {
         let mut args = std::env::args().skip(1);
@@ -17,11 +17,27 @@ fn main() {
                 }
                 let zip_path = std::path::PathBuf::from(zip_path);
                 let dst_dir = std::path::PathBuf::from(dst_dir);
-                match winusb_switcher_lite_lib::extract_zip(&zip_path, &dst_dir)
-                    .and_then(|_| winusb_switcher_lite_lib::linux_post_extract_fixups(&dst_dir)) {
+                match winusb_switcher_lite_lib::extract_zip(&zip_path, &dst_dir).and_then(|_| {
+                    winusb_switcher_lite_lib::linux_try_install_segger_udev_after_extract(&dst_dir)
+                })
+                .and_then(|_| winusb_switcher_lite_lib::linux_post_extract_fixups(&dst_dir)) {
                     Ok(()) => std::process::exit(0),
                     Err(e) => {
                         eprintln!("Extraction failed: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            } else if flag == "--lite-install-udev" {
+                let rules = args.next().unwrap_or_default();
+                if rules.is_empty() {
+                    eprintln!("Usage: --lite-install-udev <path_to_jlink.rules>");
+                    std::process::exit(2);
+                }
+                let rules = std::path::PathBuf::from(rules);
+                match winusb_switcher_lite_lib::linux_install_segger_udev_rules_from_src(&rules) {
+                    Ok(()) => std::process::exit(0),
+                    Err(e) => {
+                        eprintln!("udev install failed: {}", e);
                         std::process::exit(1);
                     }
                 }

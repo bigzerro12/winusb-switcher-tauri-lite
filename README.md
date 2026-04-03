@@ -9,7 +9,7 @@ Built with **Rust** (`src-tauri`) and **React + TypeScript** (`src/renderer`).
 | Platform | Bundled J-Link | First-run behavior |
 |----------|----------------|-------------------|
 | **Windows x64** | Windows zip only (installers do **not** include Linux archives) | Unpacks to `%AppData%\Roaming\SEGGER\JLink_V930a` |
-| **Linux x64** | Linux zip only | Unpacks under **`/opt/SEGGER`** (zip may add a `JLink_V930a/` subfolder); **pkexec** may prompt if elevation is required |
+| **Linux x64** | Linux zip only | Unpacks under **`/opt/SEGGER`** (zip may add a `JLink_V930a/` subfolder). If `/opt` is not writable, **one `pkexec` prompt** runs **extract + SEGGER `99-jlink` udev rules + executable fixups** together. |
 | **macOS** | 22-byte empty ZIP stub only (build-time; satisfies Tauri’s resource glob) | Bundled J-Link extraction is not implemented for macOS yet — the app cannot use the Lite flow on macOS until a real Darwin payload exists |
 
 Release **installers** are built per OS; each artifact contains **only** the J-Link zip for that target. Canonical zips live in **`src-tauri/jlink-bundles/`** (tracked with **Git LFS**). At dev/build time, **`scripts/stage-jlink-for-build.mjs`** copies the matching zip into **`src-tauri/resources/jlink/`** (gitignored) so Tauri bundles a single payload.
@@ -210,9 +210,7 @@ Workflows live under [`.github/workflows/`](.github/workflows/). Checkout uses *
 - **Invalid zip / EOCD / LFS pointer** — Install Git LFS, `git lfs pull`, rebuild.
 - **Linux permission denied under `/opt`** — On first run, Lite installs the bundled J-Link under `/opt/SEGGER`. If `/opt` is not writable, you’ll be prompted **once** via **pkexec** to complete extraction + permission fixups.
 - **“J-Link not found” after bootstrap** — Ensure staging ran (use `yarn tauri:dev` / `yarn tauri:build`), and on Linux that `JLinkExe` exists under `/opt/SEGGER` (flat) or `/opt/SEGGER/JLink_V930a` (nested zip) and is executable.
-- **Linux can’t see probes / permission denied opening USB device** — Install SEGGER’s udev rules (recommended). Typical options:
-  - Install SEGGER’s official package for your distro (it usually ships `99-jlink.rules`), or
-  - Copy rules manually (file name varies by distro; example):
+- **Linux can’t see probes / permission denied opening USB device** — The app installs SEGGER’s **`99-jlink.rules`** (from the bundled zip) automatically **in the same elevated step as `/opt` extraction** when `pkexec` is used—no separate `sudo` for udev in that path. If you use a rare setup where `/opt` is user-writable, the app may prompt **once** with `pkexec` only for udev. You can also install rules manually:
 
 ```bash
 # Example (adjust if your system uses a different file name/path)
