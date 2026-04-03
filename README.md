@@ -216,8 +216,10 @@ To push **`main`** (no tags) to a **second remote** (e.g. another GitHub account
 
 Maintainers may keep **`main`** and **`v*`** tags aligned across:
 
-- `git@github.com:ntgiahuy25d/winusb-switcher-tauri-lite.git`
+- `git@github.com-ntgiahuy:ntgiahuy25d/winusb-switcher-tauri-lite.git` (SSH host alias → ntgiahuy25d key; see `~/.ssh/config`)
 - `git@github.com:bigzerro12/winusb-switcher-tauri-lite.git`
+
+If both GitHub accounts use **`IdentitiesOnly`** keys, **do not** define two separate `Host	github.com` blocks with different `IdentityFile` values — SSH only honors the first. Use **`Host github.com-ntgiahuy`** (or similar) for the second account.
 
 Use a separate **`git remote`** per account (SSH recommended). After tagging a release:
 
