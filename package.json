@@ -13,7 +13,8 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "push:testing": "bash scripts/push-testing-remote.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",

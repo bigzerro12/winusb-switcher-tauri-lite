@@ -205,6 +205,8 @@ yarn tauri:dev    # full app (runs staging script, then Vite + Rust)
 
 Workflows live under [`.github/workflows/`](.github/workflows/). Checkout uses **`lfs: true`** so CI pulls LFS objects before `yarn tauri:build`.
 
+To push **`main`** (no tags) to a **second remote** (e.g. another GitHub account for testing / fresh LFS quota): add the remote, authenticate as that user, then run **`yarn push:testing`** (see [`scripts/push-testing-remote.sh`](scripts/push-testing-remote.sh)).
+
 **GitHub Actions fails at checkout with “exceeded its LFS budget”** — That message comes from **GitHub’s Git LFS quota** (storage + bandwidth), not from the app. Anyone cloning with LFS (including `actions/checkout` with `lfs: true`) must be able to download the `JLink_V930a.zip` objects tracked in [`.gitattributes`](.gitattributes).
 
 What you can do:
